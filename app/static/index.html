@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>StackLoom Incident Copilot</title>
+<style>
+:root{color-scheme:dark;font-family:system-ui,sans-serif;background:#081322;color:#e7effb}*{box-sizing:border-box}body{margin:0}main{max-width:1050px;margin:auto;padding:50px 24px}header{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}.brand{font-weight:800;letter-spacing:.09em;color:#64d8ff}.badge{border:1px solid #31577b;border-radius:30px;padding:8px 14px;font-size:13px}h1{font-size:clamp(32px,6vw,60px);max-width:750px;line-height:1.1;margin-bottom:20px}p{color:#aebfd4;line-height:1.65}.grid{display:grid;grid-template-columns:1fr 1.5fr;gap:24px;margin-top:32px}.card{background:#101f33;border:1px solid #243b57;border-radius:18px;padding:25px}label{display:block;margin:18px 0 10px}select,button{font:inherit;width:100%;padding:14px;border-radius:9px;border:1px solid #355879}select{background:#091525;color:#fff}button{margin-top:18px;background:#57ceff;color:#062135;font-weight:750;cursor:pointer}button:disabled{opacity:.6}a{color:#69d8ff}h2{font-size:22px}pre{white-space:pre-wrap;overflow-wrap:anywhere;font:inherit;color:#becde0;line-height:1.6}.muted{font-size:13px}#status{min-height:24px}footer{margin-top:30px;color:#8fa7c2;font-size:13px}@media(max-width:720px){.grid{grid-template-columns:1fr}main{padding:28px 18px}}
+</style></head><body><main><header><span class="brand">STACKLOOM LABS</span><span class="badge">Milestone 1 · Local incident lab</span></header>
+<h1>From incident to evidence.</h1><p>Explore repeatable failures and inspect the evidence behind an investigation.<br>Synthetic data · Rule-based baseline · No model calls</p>
+<div class="grid"><section class="card"><h2>Run an investigation</h2><label for="scenario">Incident scenario</label><select id="scenario"><option value="bad-config">Missing configuration</option><option value="dependency-down">Dependency timeout</option><option value="release-regression">Release regression</option><option value="unknown">Insufficient evidence</option><option value="healthy">Healthy application</option></select><button id="investigate">Investigate scenario</button><p id="status" role="status" aria-live="polite"></p><p class="muted">This demo never changes infrastructure or performs recovery actions.</p><a href="/docs">Explore API documentation</a></section>
+<section class="card" aria-live="polite"><h2 id="finding">Evidence comes first.</h2><p id="next">Choose a scenario to view its observations and suggested next step.</p><pre id="evidence"></pre><a id="runbook" hidden>Read the matching runbook</a><p class="muted" id="runid"></p></section></div><footer>StackLoom Incident Copilot / v0.1.0 · MCP, Azure telemetry and AI investigation are planned milestones.</footer></main>
+<script>
+const button=document.getElementById('investigate');
+button.addEventListener('click',async()=>{
+ const status=document.getElementById('status'); button.disabled=true;status.textContent='Investigating…';
+ document.getElementById('runbook').hidden=true;
+ try{
+  const response=await fetch('/api/investigate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({scenario:document.getElementById('scenario').value})});
+  if(!response.ok)throw new Error('Investigation failed ('+response.status+'). Try again.');
+  const data=await response.json();
+  document.getElementById('finding').textContent=data.finding;
+  document.getElementById('next').textContent=data.next_step;
+  document.getElementById('evidence').textContent=data.evidence.map(e=>e.id+' · '+e.source+'\n'+e.detail).join('\n\n');
+  document.getElementById('runid').textContent='Investigation '+data.investigation_id;
+  if(data.runbook){const link=document.getElementById('runbook');link.href=data.runbook;link.hidden=false;}
+  status.textContent='Complete · no recovery executed';
+ }catch(error){status.textContent=error.message;document.getElementById('finding').textContent='Investigation unavailable';document.getElementById('next').textContent='Retry when the API is available.';document.getElementById('evidence').textContent='';document.getElementById('runid').textContent='';}
+ finally{button.disabled=false;}
+});
+</script></body></html>

@@ -1,0 +1,26 @@
+trigger:
+  branches:
+    include: [main]
+pr:
+  branches:
+    include: [main]
+pool:
+  vmImage: ubuntu-latest
+steps:
+- task: UsePythonVersion@0
+  inputs:
+    versionSpec: '3.12'
+  displayName: Select Python
+- script: python -m pip install -r requirements-dev.txt
+  displayName: Install dependencies
+- script: python -m pytest -q --junitxml=results/tests.xml
+  displayName: Test incident behavior
+- task: PublishTestResults@2
+  condition: succeededOrFailed()
+  inputs:
+    testResultsFormat: JUnit
+    testResultsFiles: results/tests.xml
+    failTaskOnFailedTests: true
+    failTaskOnMissingResultsFile: true
+- script: docker build -t stackloom-incident-copilot:$(Build.BuildId) .
+  displayName: Validate container build
