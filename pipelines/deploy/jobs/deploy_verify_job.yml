@@ -1,0 +1,43 @@
+parameters:
+  - name: agentImage
+    type: string
+  - name: azureServiceConnection
+    type: string
+  - name: location
+    type: string
+  - name: resourceGroupName
+    type: string
+  - name: projectPrefix
+    type: string
+  - name: environmentName
+    type: string
+  - name: imageRepository
+    type: string
+  - name: imageTag
+    type: string
+
+jobs:
+  - deployment: DeployAndVerify
+    displayName: Deploy image, smoke test and retain rollback
+    timeoutInMinutes: 20
+    pool:
+      vmImage: ${{ parameters.agentImage }}
+    environment: stackloom-dev
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+            - checkout: self
+              clean: true
+              fetchDepth: 1
+              persistCredentials: false
+
+            - template: ../steps/deploy_verify_steps.yml
+              parameters:
+                azureServiceConnection: ${{ parameters.azureServiceConnection }}
+                location: ${{ parameters.location }}
+                resourceGroupName: ${{ parameters.resourceGroupName }}
+                projectPrefix: ${{ parameters.projectPrefix }}
+                environmentName: ${{ parameters.environmentName }}
+                imageRepository: ${{ parameters.imageRepository }}
+                imageTag: ${{ parameters.imageTag }}
