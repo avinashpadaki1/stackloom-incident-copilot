@@ -1,10 +1,16 @@
 # StackLoom Incident Copilot
 
+[![Azure DevOps Build](https://dev.azure.com/facon1/stackloom-incident-copilot/_apis/build/status/stackloom-incident-copilot?branchName=main)](https://dev.azure.com/facon1/stackloom-incident-copilot/_build/latest?definitionId=34&branchName=main)
+
 Milestone 1 — working local incident lab for an Azure AI engineering portfolio.
 
 **Implemented:** FastAPI API, browser UI, five synthetic scenarios, evidence-linked rule-based investigations, three runbooks, tests, Dockerfile and Azure DevOps CI YAML.
 
 **Not yet implemented:** AI model calls, MCP server, real deployment/log retrieval, Azure infrastructure, authentication and automated remediation. No Azure costs are incurred by running the local demo.
+
+## Verified CI baseline
+
+Azure DevOps build `20261113.1` validated Milestone 1 from `main` at commit `8cc4f99b`: 13 of 13 tests passed, JUnit results were published, and the Docker image build completed successfully. See [`docs/validation.md`](docs/validation.md) for the evidence and current validation limits.
 
 ## Quick start — Windows PowerShell
 Install Python 3.12, then open a terminal in this folder:
@@ -36,21 +42,8 @@ docker run --rm -p 127.0.0.1:8000:8000 stackloom-incident-copilot:local
 
 The container runs as a non-root user. This unauthenticated milestone is for local use.
 
-## Publish the source to your private GitHub repository
-Create `avinashpadaki1/stackloom-incident-copilot` as a **private** repository. Grant the ChatGPT GitHub connection access if you want assistance pushing/reviewing changes. If pushing yourself to a new, empty repository:
-
-```bash
-git init -b main
-git add .
-git commit -m "Add StackLoom incident lab foundation"
-git remote add origin https://github.com/avinashpadaki1/stackloom-incident-copilot.git
-git push -u origin main
-```
-
-Use your normal GitHub authentication. Do not place tokens in files or commands. If you initialized the remote with a README, clone it and copy these files into the clone instead; do not force push.
-
 ## Azure DevOps setup
-Create the `StackLoom-Labs` project. In Pipelines, select New pipeline -> GitHub -> this repository -> Existing Azure Pipelines YAML file -> `/azure-pipelines.yml`. Authorize access to this repository. Ensure a Microsoft-hosted parallel job is available. The pipeline installs dependencies, runs tests, publishes JUnit results and builds the container. It does not push images or deploy resources.
+The pipeline is connected to this GitHub repository and runs from `/azure-pipelines.yml`. It installs dependencies, runs tests, publishes JUnit results and builds the container. It does not push images or deploy resources.
 
 ## Demo script
 1. Investigate missing configuration; inspect E1 and E2 and the runbook.
