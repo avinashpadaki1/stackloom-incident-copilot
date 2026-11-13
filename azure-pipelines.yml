@@ -1,26 +1,33 @@
+name: $(Date:yyyyMMdd).$(Rev:r)
+
 trigger:
+  batch: true
   branches:
-    include: [main]
+    include:
+      - main
+
 pr:
+  autoCancel: true
   branches:
-    include: [main]
-pool:
-  vmImage: ubuntu-24.04
-steps:
-- task: UsePythonVersion@0
-  inputs:
-    versionSpec: '3.12'
-  displayName: Select Python
-- script: python -m pip install -r requirements-dev.txt
-  displayName: Install dependencies
-- script: python -m pytest -q --junitxml=results/tests.xml
-  displayName: Test incident behavior
-- task: PublishTestResults@2
-  condition: succeededOrFailed()
-  inputs:
-    testResultsFormat: JUnit
-    testResultsFiles: results/tests.xml
-    failTaskOnFailedTests: true
-    failTaskOnMissingResultsFile: true
-- script: docker build -t stackloom-incident-copilot:$(Build.BuildId) .
-  displayName: Validate container build
+    include:
+      - main
+
+variables:
+  agentImage: ubuntu-24.04
+  pythonVersion: '3.12'
+  requirementsFile: requirements-dev.txt
+  junitPath: $(Build.SourcesDirectory)/results/tests.xml
+  imageRepository: stackloom-incident-copilot
+  imageTag: $(Build.SourceVersion)
+
+stages:
+  - template: pipelines/stages/ci_stage.yml
+    parameters:
+      agentImage: $(agentImage)
+      pythonVersion: $(pythonVersion)
+      requirementsFile: $(requirementsFile)
+      junitPath: $(junitPath)
+      dockerfile: Dockerfile
+      buildContext: .
+      imageRepository: $(imageRepository)
+      imageTag: $(imageTag)

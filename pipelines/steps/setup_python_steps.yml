@@ -1,0 +1,19 @@
+parameters:
+  - name: pythonVersion
+    type: string
+  - name: requirementsFile
+    type: string
+
+steps:
+  - task: UsePythonVersion@0
+    displayName: Select Python ${{ parameters.pythonVersion }}
+    inputs:
+      versionSpec: ${{ parameters.pythonVersion }}
+
+  - task: Bash@3
+    displayName: Install pinned dependencies
+    inputs:
+      targetType: inline
+      script: |
+        set -euo pipefail
+        python -m pip install --disable-pip-version-check --requirement "${{ parameters.requirementsFile }}"

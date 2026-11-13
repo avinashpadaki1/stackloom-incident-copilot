@@ -1,0 +1,32 @@
+parameters:
+  - name: agentImage
+    type: string
+  - name: pythonVersion
+    type: string
+  - name: requirementsFile
+    type: string
+  - name: junitPath
+    type: string
+
+jobs:
+  - job: PythonValidation
+    displayName: Validate Python application
+    timeoutInMinutes: 10
+    pool:
+      vmImage: ${{ parameters.agentImage }}
+    workspace:
+      clean: all
+    steps:
+      - checkout: self
+        clean: true
+        fetchDepth: 1
+        persistCredentials: false
+
+      - template: ../steps/setup_python_steps.yml
+        parameters:
+          pythonVersion: ${{ parameters.pythonVersion }}
+          requirementsFile: ${{ parameters.requirementsFile }}
+
+      - template: ../steps/run_python_validation_steps.yml
+        parameters:
+          junitPath: ${{ parameters.junitPath }}

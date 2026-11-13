@@ -1,0 +1,31 @@
+parameters:
+  - name: junitPath
+    type: string
+
+steps:
+  - task: Bash@3
+    displayName: Compile Python sources
+    inputs:
+      targetType: inline
+      script: |
+        set -euo pipefail
+        python -m compileall -q app tests
+
+  - task: Bash@3
+    displayName: Run API and behavior tests
+    inputs:
+      targetType: inline
+      script: |
+        set -euo pipefail
+        mkdir -p "$(dirname "${{ parameters.junitPath }}")"
+        python -m pytest -q --junitxml="${{ parameters.junitPath }}"
+
+  - task: PublishTestResults@2
+    displayName: Publish JUnit test evidence
+    condition: succeededOrFailed()
+    inputs:
+      testResultsFormat: JUnit
+      testResultsFiles: ${{ parameters.junitPath }}
+      failTaskOnFailedTests: true
+      failTaskOnMissingResultsFile: true
+      testRunTitle: StackLoom API and behavior tests
