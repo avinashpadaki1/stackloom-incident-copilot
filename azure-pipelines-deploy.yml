@@ -17,6 +17,16 @@ trigger:
 
 pr: none
 
+parameters:
+  - name: monthlyBudgetAmount
+    displayName: Monthly Azure budget notification threshold
+    type: number
+    default: 20
+  - name: logRetentionDays
+    displayName: Log Analytics retention in days
+    type: number
+    default: 30
+
 variables:
   agentImage: ubuntu-24.04
   azureServiceConnection: sc-stackloom-azure-dev
@@ -26,8 +36,6 @@ variables:
   environmentName: dev
   imageRepository: stackloom-incident-copilot
   imageTag: $(Build.SourceVersion)
-  monthlyBudgetAmount: 20
-  logRetentionDays: 30
 
 stages:
   - template: pipelines/deploy/stages/deploy_stage.yml
@@ -40,5 +48,5 @@ stages:
       environmentName: $(environmentName)
       imageRepository: $(imageRepository)
       imageTag: $(imageTag)
-      monthlyBudgetAmount: $(monthlyBudgetAmount)
-      logRetentionDays: $(logRetentionDays)
+      monthlyBudgetAmount: ${{ parameters.monthlyBudgetAmount }}
+      logRetentionDays: ${{ parameters.logRetentionDays }}
