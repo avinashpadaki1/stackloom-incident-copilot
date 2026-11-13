@@ -1,0 +1,96 @@
+parameters:
+  - name: azureServiceConnection
+    type: string
+  - name: location
+    type: string
+  - name: resourceGroupName
+    type: string
+  - name: projectPrefix
+    type: string
+  - name: environmentName
+    type: string
+  - name: imageRepository
+    type: string
+  - name: imageTag
+    type: string
+
+steps:
+  - task: AzureCLI@2
+    displayName: Capture current healthy revision
+    inputs:
+      azureSubscription: ${{ parameters.azureServiceConnection }}
+      scriptType: bash
+      scriptLocation: inlineScript
+      inlineScript: |
+        set -euo pipefail
+        app_name="ca-${{ parameters.projectPrefix }}-${{ parameters.environmentName }}"
+        previous_revision=""
+        if az containerapp show --name "$app_name" --resource-group ${{ parameters.resourceGroupName }} >/dev/null 2>&1; then
+          previous_revision="$(az containerapp revision list             --name "$app_name"             --resource-group ${{ parameters.resourceGroupName }}             --query "[?properties.active && properties.healthState=='Healthy'] | [0].name"             --output tsv)"
+        fi
+        echo "##vso[task.setvariable variable=previousRevision]$previous_revision"
+
+  - task: AzureCLI@2
+    displayName: Deploy immutable Container App revision
+    inputs:
+      azureSubscription: ${{ parameters.azureServiceConnection }}
+      scriptType: bash
+      scriptLocation: inlineScript
+      workingDirectory: $(Build.SourcesDirectory)
+      inlineScript: |
+        set -euo pipefail
+        registry_name="$(az acr list --resource-group ${{ parameters.resourceGroupName }} --query "[0].name" -o tsv)"
+        environment_name="$(az containerapp env list --resource-group ${{ parameters.resourceGroupName }} --query "[0].name" -o tsv)"
+        identity_name="$(az identity list --resource-group ${{ parameters.resourceGroupName }} --query "[0].name" -o tsv)"
+        test -n "$registry_name"
+        test -n "$environment_name"
+        test -n "$identity_name"
+
+        az deployment group create           --name stackloom-app-$(Build.BuildId)           --resource-group ${{ parameters.resourceGroupName }}           --template-file infra/app.bicep           --parameters             location=${{ parameters.location }}             projectPrefix=${{ parameters.projectPrefix }}             environmentName=${{ parameters.environmentName }}             registryName="$registry_name"             containerAppsEnvironmentName="$environment_name"             runtimeIdentityName="$identity_name"             imageRepository=${{ parameters.imageRepository }}             imageTag=${{ parameters.imageTag }}           --only-show-errors
+
+        fqdn="$(az deployment group show           --name stackloom-app-$(Build.BuildId)           --resource-group ${{ parameters.resourceGroupName }}           --query properties.outputs.fqdn.value           --output tsv)"
+        test -n "$fqdn"
+        echo "##vso[task.setvariable variable=appFqdn]$fqdn"
+
+  - task: Bash@3
+    displayName: Smoke test deployed health endpoint
+    inputs:
+      targetType: inline
+      script: |
+        set -euo pipefail
+        health_url="https://$(appFqdn)/health"
+        for attempt in $(seq 1 20); do
+          if curl --fail --silent --show-error             --connect-timeout 10             --max-time 30             "$health_url" | tee "$(Build.ArtifactStagingDirectory)/health-response.json"; then
+            exit 0
+          fi
+          echo "Health check attempt $attempt failed; retrying in 15 seconds."
+          sleep 15
+        done
+        exit 1
+
+  - task: PublishPipelineArtifact@1
+    displayName: Publish smoke-test evidence
+    condition: succeededOrFailed()
+    inputs:
+      targetPath: $(Build.ArtifactStagingDirectory)
+      artifact: deployment-evidence-$(Build.BuildId)
+      publishLocation: pipeline
+
+  - task: AzureCLI@2
+    displayName: Restore traffic to previous healthy revision
+    condition: failed()
+    inputs:
+      azureSubscription: ${{ parameters.azureServiceConnection }}
+      scriptType: bash
+      scriptLocation: inlineScript
+      inlineScript: |
+        set -euo pipefail
+        if [ -z "$PREVIOUS_REVISION" ]; then
+          echo "No previous healthy revision was available for automatic rollback." >&2
+          exit 0
+        fi
+        app_name="ca-${{ parameters.projectPrefix }}-${{ parameters.environmentName }}"
+        az containerapp revision activate           --name "$app_name"           --resource-group ${{ parameters.resourceGroupName }}           --revision "$PREVIOUS_REVISION"
+        az containerapp ingress traffic set           --name "$app_name"           --resource-group ${{ parameters.resourceGroupName }}           --revision-weight "$PREVIOUS_REVISION=100"
+    env:
+      PREVIOUS_REVISION: $(previousRevision)
