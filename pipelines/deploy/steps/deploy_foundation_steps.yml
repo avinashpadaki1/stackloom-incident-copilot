@@ -1,0 +1,40 @@
+parameters:
+  - name: azureServiceConnection
+    type: string
+  - name: location
+    type: string
+  - name: resourceGroupName
+    type: string
+  - name: projectPrefix
+    type: string
+  - name: environmentName
+    type: string
+  - name: monthlyBudgetAmount
+    type: number
+  - name: logRetentionDays
+    type: number
+
+steps:
+  - task: AzureCLI@2
+    displayName: Deploy resource group, budget and platform foundation
+    inputs:
+      azureSubscription: ${{ parameters.azureServiceConnection }}
+      scriptType: bash
+      scriptLocation: inlineScript
+      workingDirectory: $(Build.SourcesDirectory)
+      inlineScript: |
+        set -euo pipefail
+        budget_start="$(date -u +%Y-%m-01)"
+        az deployment sub create           --name stackloom-foundation-${{ parameters.environmentName }}           --location ${{ parameters.location }}           --template-file infra/main.bicep           --parameters             location=${{ parameters.location }}             resourceGroupName=${{ parameters.resourceGroupName }}             projectPrefix=${{ parameters.projectPrefix }}             environmentName=${{ parameters.environmentName }}             monthlyBudgetAmount=${{ parameters.monthlyBudgetAmount }}             budgetContactEmail="$BUDGET_CONTACT_EMAIL"             logRetentionDays=${{ parameters.logRetentionDays }}             budgetStartDate="$budget_start"           --only-show-errors
+    env:
+      BUDGET_CONTACT_EMAIL: $(BUDGET_CONTACT_EMAIL)
+
+  - task: AzureCLI@2
+    displayName: Record deployed foundation
+    inputs:
+      azureSubscription: ${{ parameters.azureServiceConnection }}
+      scriptType: bash
+      scriptLocation: inlineScript
+      inlineScript: |
+        set -euo pipefail
+        az resource list           --resource-group ${{ parameters.resourceGroupName }}           --query "[].{name:name,type:type,location:location}"           --output table

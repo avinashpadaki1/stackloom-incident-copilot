@@ -1,0 +1,41 @@
+parameters:
+  - name: agentImage
+    type: string
+  - name: azureServiceConnection
+    type: string
+  - name: location
+    type: string
+  - name: resourceGroupName
+    type: string
+  - name: projectPrefix
+    type: string
+  - name: environmentName
+    type: string
+  - name: monthlyBudgetAmount
+    type: number
+  - name: logRetentionDays
+    type: number
+
+jobs:
+  - job: ValidateInfrastructure
+    displayName: Compile, validate and preview Bicep
+    timeoutInMinutes: 15
+    pool:
+      vmImage: ${{ parameters.agentImage }}
+    workspace:
+      clean: all
+    steps:
+      - checkout: self
+        clean: true
+        fetchDepth: 1
+        persistCredentials: false
+
+      - template: ../steps/validate_infrastructure_steps.yml
+        parameters:
+          azureServiceConnection: ${{ parameters.azureServiceConnection }}
+          location: ${{ parameters.location }}
+          resourceGroupName: ${{ parameters.resourceGroupName }}
+          projectPrefix: ${{ parameters.projectPrefix }}
+          environmentName: ${{ parameters.environmentName }}
+          monthlyBudgetAmount: ${{ parameters.monthlyBudgetAmount }}
+          logRetentionDays: ${{ parameters.logRetentionDays }}

@@ -1,0 +1,24 @@
+parameters:
+  - name: azureServiceConnection
+    type: string
+  - name: resourceGroupName
+    type: string
+  - name: imageRepository
+    type: string
+  - name: imageTag
+    type: string
+
+steps:
+  - task: AzureCLI@2
+    displayName: Build image in Azure Container Registry
+    inputs:
+      azureSubscription: ${{ parameters.azureServiceConnection }}
+      scriptType: bash
+      scriptLocation: inlineScript
+      workingDirectory: $(Build.SourcesDirectory)
+      inlineScript: |
+        set -euo pipefail
+        registry_name="$(az acr list           --resource-group ${{ parameters.resourceGroupName }}           --query "[0].name"           --output tsv)"
+        test -n "$registry_name"
+        az acr build           --registry "$registry_name"           --image "${{ parameters.imageRepository }}:${{ parameters.imageTag }}"           --file Dockerfile           .
+        az acr repository show           --name "$registry_name"           --image "${{ parameters.imageRepository }}:${{ parameters.imageTag }}"           --query "{digest:digest,name:name,tag:tag}"           --output table

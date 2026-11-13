@@ -1,0 +1,78 @@
+name: destroy-$(Date:yyyyMMdd).$(Rev:r)
+
+trigger: none
+pr: none
+
+parameters:
+  - name: confirmation
+    displayName: Type DELETE-STACKLOOM-DEV to permanently remove the dev environment
+    type: string
+    default: NOT-CONFIRMED
+
+variables:
+  agentImage: ubuntu-24.04
+  azureServiceConnection: sc-stackloom-azure-dev
+  resourceGroupName: rg-stackloom-dev-cac
+  budgetName: stackloom-dev-monthly
+
+stages:
+  - stage: DestroyDev
+    displayName: Destroy StackLoom dev
+    jobs:
+      - deployment: DestroyDev
+        displayName: Delete budget and resource group
+        timeoutInMinutes: 60
+        pool:
+          vmImage: $(agentImage)
+        environment: stackloom-dev-destroy
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: none
+
+                - task: AzureCLI@2
+                  displayName: Verify identity and confirmation
+                  inputs:
+                    azureSubscription: $(azureServiceConnection)
+                    scriptType: bash
+                    scriptLocation: inlineScript
+                    inlineScript: |
+                      set -euo pipefail
+                      if [ "$CONFIRMATION" != "DELETE-STACKLOOM-DEV" ]; then
+                        echo "Destructive teardown blocked: confirmation phrase did not match." >&2
+                        exit 1
+                      fi
+                      actual_subscription="$(az account show --query id -o tsv)"
+                      if [ "$actual_subscription" != "$EXPECTED_SUBSCRIPTION_ID" ]; then
+                        echo "Destructive teardown blocked: unexpected Azure subscription." >&2
+                        exit 1
+                      fi
+                  env:
+                    CONFIRMATION: ${{ parameters.confirmation }}
+                    EXPECTED_SUBSCRIPTION_ID: $(EXPECTED_SUBSCRIPTION_ID)
+
+                - task: AzureCLI@2
+                  displayName: Delete subscription budget and dev resource group
+                  inputs:
+                    azureSubscription: $(azureServiceConnection)
+                    scriptType: bash
+                    scriptLocation: inlineScript
+                    inlineScript: |
+                      set -euo pipefail
+                      subscription_id="$(az account show --query id -o tsv)"
+                      budget_url="https://management.azure.com/subscriptions/$subscription_id/providers/Microsoft.Consumption/budgets/$(budgetName)?api-version=2023-11-01"
+
+                      if az rest --method get --url "$budget_url" >/dev/null 2>&1; then
+                        az rest --method delete --url "$budget_url"
+                      fi
+
+                      if az group exists --name $(resourceGroupName) | grep -q true; then
+                        az group delete --name $(resourceGroupName) --yes
+                      fi
+
+                      if az group exists --name $(resourceGroupName) | grep -q true; then
+                        echo "Resource group still exists after delete returned." >&2
+                        exit 1
+                      fi
+                      echo "StackLoom dev resource group deletion completed."

@@ -1,0 +1,66 @@
+parameters:
+  - name: azureServiceConnection
+    type: string
+  - name: location
+    type: string
+  - name: resourceGroupName
+    type: string
+  - name: projectPrefix
+    type: string
+  - name: environmentName
+    type: string
+  - name: monthlyBudgetAmount
+    type: number
+  - name: logRetentionDays
+    type: number
+
+steps:
+  - task: AzureCLI@2
+    displayName: Compile Bicep and verify deployment identity
+    inputs:
+      azureSubscription: ${{ parameters.azureServiceConnection }}
+      scriptType: bash
+      scriptLocation: inlineScript
+      workingDirectory: $(Build.SourcesDirectory)
+      inlineScript: |
+        set -euo pipefail
+        test -n "$EXPECTED_SUBSCRIPTION_ID"
+        test -n "$BUDGET_CONTACT_EMAIL"
+        actual_subscription="$(az account show --query id -o tsv)"
+        if [ "$actual_subscription" != "$EXPECTED_SUBSCRIPTION_ID" ]; then
+          echo "The service connection selected an unexpected Azure subscription." >&2
+          exit 1
+        fi
+        az bicep build --file infra/main.bicep --stdout >/dev/null
+        az bicep build --file infra/app.bicep --stdout >/dev/null
+    env:
+      EXPECTED_SUBSCRIPTION_ID: $(EXPECTED_SUBSCRIPTION_ID)
+      BUDGET_CONTACT_EMAIL: $(BUDGET_CONTACT_EMAIL)
+
+  - task: AzureCLI@2
+    displayName: Validate subscription deployment
+    inputs:
+      azureSubscription: ${{ parameters.azureServiceConnection }}
+      scriptType: bash
+      scriptLocation: inlineScript
+      workingDirectory: $(Build.SourcesDirectory)
+      inlineScript: |
+        set -euo pipefail
+        budget_start="$(date -u +%Y-%m-01)"
+        az deployment sub validate           --name stackloom-validation-$(Build.BuildId)           --location ${{ parameters.location }}           --template-file infra/main.bicep           --parameters             location=${{ parameters.location }}             resourceGroupName=${{ parameters.resourceGroupName }}             projectPrefix=${{ parameters.projectPrefix }}             environmentName=${{ parameters.environmentName }}             monthlyBudgetAmount=${{ parameters.monthlyBudgetAmount }}             budgetContactEmail="$BUDGET_CONTACT_EMAIL"             logRetentionDays=${{ parameters.logRetentionDays }}             budgetStartDate="$budget_start"           --only-show-errors
+    env:
+      BUDGET_CONTACT_EMAIL: $(BUDGET_CONTACT_EMAIL)
+
+  - task: AzureCLI@2
+    displayName: Preview subscription changes
+    inputs:
+      azureSubscription: ${{ parameters.azureServiceConnection }}
+      scriptType: bash
+      scriptLocation: inlineScript
+      workingDirectory: $(Build.SourcesDirectory)
+      inlineScript: |
+        set -euo pipefail
+        budget_start="$(date -u +%Y-%m-01)"
+        az deployment sub what-if           --name stackloom-whatif-$(Build.BuildId)           --location ${{ parameters.location }}           --template-file infra/main.bicep           --parameters             location=${{ parameters.location }}             resourceGroupName=${{ parameters.resourceGroupName }}             projectPrefix=${{ parameters.projectPrefix }}             environmentName=${{ parameters.environmentName }}             monthlyBudgetAmount=${{ parameters.monthlyBudgetAmount }}             budgetContactEmail="$BUDGET_CONTACT_EMAIL"             logRetentionDays=${{ parameters.logRetentionDays }}             budgetStartDate="$budget_start"           --result-format ResourceIdOnly           --only-show-errors
+    env:
+      BUDGET_CONTACT_EMAIL: $(BUDGET_CONTACT_EMAIL)

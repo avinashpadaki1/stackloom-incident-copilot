@@ -1,0 +1,44 @@
+name: deploy-$(Date:yyyyMMdd).$(Rev:r)
+
+trigger:
+  batch: true
+  branches:
+    include:
+      - main
+  paths:
+    include:
+      - app/**
+      - runbooks/**
+      - Dockerfile
+      - requirements.txt
+      - infra/**
+      - pipelines/deploy/**
+      - azure-pipelines-deploy.yml
+
+pr: none
+
+variables:
+  agentImage: ubuntu-24.04
+  azureServiceConnection: sc-stackloom-azure-dev
+  location: canadacentral
+  resourceGroupName: rg-stackloom-dev-cac
+  projectPrefix: stackloom
+  environmentName: dev
+  imageRepository: stackloom-incident-copilot
+  imageTag: $(Build.SourceVersion)
+  monthlyBudgetAmount: 20
+  logRetentionDays: 30
+
+stages:
+  - template: pipelines/deploy/stages/deploy_stage.yml
+    parameters:
+      agentImage: $(agentImage)
+      azureServiceConnection: $(azureServiceConnection)
+      location: $(location)
+      resourceGroupName: $(resourceGroupName)
+      projectPrefix: $(projectPrefix)
+      environmentName: $(environmentName)
+      imageRepository: $(imageRepository)
+      imageTag: $(imageTag)
+      monthlyBudgetAmount: $(monthlyBudgetAmount)
+      logRetentionDays: $(logRetentionDays)

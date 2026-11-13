@@ -1,0 +1,81 @@
+parameters:
+  - name: agentImage
+    type: string
+  - name: azureServiceConnection
+    type: string
+  - name: location
+    type: string
+  - name: resourceGroupName
+    type: string
+  - name: projectPrefix
+    type: string
+  - name: environmentName
+    type: string
+  - name: imageRepository
+    type: string
+  - name: imageTag
+    type: string
+  - name: monthlyBudgetAmount
+    type: number
+  - name: logRetentionDays
+    type: number
+
+stages:
+  - stage: ValidateInfrastructure
+    displayName: Validate infrastructure plan
+    jobs:
+      - template: ../jobs/validate_infrastructure_job.yml
+        parameters:
+          agentImage: ${{ parameters.agentImage }}
+          azureServiceConnection: ${{ parameters.azureServiceConnection }}
+          location: ${{ parameters.location }}
+          resourceGroupName: ${{ parameters.resourceGroupName }}
+          projectPrefix: ${{ parameters.projectPrefix }}
+          environmentName: ${{ parameters.environmentName }}
+          monthlyBudgetAmount: ${{ parameters.monthlyBudgetAmount }}
+          logRetentionDays: ${{ parameters.logRetentionDays }}
+
+  - stage: DeployFoundation
+    displayName: Deploy Azure foundation
+    dependsOn: ValidateInfrastructure
+    condition: succeeded()
+    jobs:
+      - template: ../jobs/deploy_foundation_job.yml
+        parameters:
+          agentImage: ${{ parameters.agentImage }}
+          azureServiceConnection: ${{ parameters.azureServiceConnection }}
+          location: ${{ parameters.location }}
+          resourceGroupName: ${{ parameters.resourceGroupName }}
+          projectPrefix: ${{ parameters.projectPrefix }}
+          environmentName: ${{ parameters.environmentName }}
+          monthlyBudgetAmount: ${{ parameters.monthlyBudgetAmount }}
+          logRetentionDays: ${{ parameters.logRetentionDays }}
+
+  - stage: BuildImage
+    displayName: Build immutable image
+    dependsOn: DeployFoundation
+    condition: succeeded()
+    jobs:
+      - template: ../jobs/build_push_image_job.yml
+        parameters:
+          agentImage: ${{ parameters.agentImage }}
+          azureServiceConnection: ${{ parameters.azureServiceConnection }}
+          resourceGroupName: ${{ parameters.resourceGroupName }}
+          imageRepository: ${{ parameters.imageRepository }}
+          imageTag: ${{ parameters.imageTag }}
+
+  - stage: DeployAndVerify
+    displayName: Deploy and verify dev
+    dependsOn: BuildImage
+    condition: succeeded()
+    jobs:
+      - template: ../jobs/deploy_verify_job.yml
+        parameters:
+          agentImage: ${{ parameters.agentImage }}
+          azureServiceConnection: ${{ parameters.azureServiceConnection }}
+          location: ${{ parameters.location }}
+          resourceGroupName: ${{ parameters.resourceGroupName }}
+          projectPrefix: ${{ parameters.projectPrefix }}
+          environmentName: ${{ parameters.environmentName }}
+          imageRepository: ${{ parameters.imageRepository }}
+          imageTag: ${{ parameters.imageTag }}
