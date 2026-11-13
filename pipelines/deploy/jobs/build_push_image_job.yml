@@ -1,0 +1,32 @@
+parameters:
+  - name: agentImage
+    type: string
+  - name: azureServiceConnection
+    type: string
+  - name: resourceGroupName
+    type: string
+  - name: imageRepository
+    type: string
+  - name: imageTag
+    type: string
+
+jobs:
+  - job: BuildPushImage
+    displayName: Build and push immutable image
+    timeoutInMinutes: 20
+    pool:
+      vmImage: ${{ parameters.agentImage }}
+    workspace:
+      clean: all
+    steps:
+      - checkout: self
+        clean: true
+        fetchDepth: 1
+        persistCredentials: false
+
+      - template: ../steps/build_push_image_steps.yml
+        parameters:
+          azureServiceConnection: ${{ parameters.azureServiceConnection }}
+          resourceGroupName: ${{ parameters.resourceGroupName }}
+          imageRepository: ${{ parameters.imageRepository }}
+          imageTag: ${{ parameters.imageTag }}
