@@ -1,0 +1,31 @@
+parameters:
+  - name: dockerfile
+    type: string
+  - name: buildContext
+    type: string
+  - name: imageRepository
+    type: string
+  - name: imageTag
+    type: string
+
+steps:
+  - task: Bash@3
+    displayName: Build immutable container image
+    inputs:
+      targetType: inline
+      script: |
+        set -euo pipefail
+        docker build \
+          --file "${{ parameters.dockerfile }}" \
+          --tag "${{ parameters.imageRepository }}:${{ parameters.imageTag }}" \
+          "${{ parameters.buildContext }}"
+
+  - task: Bash@3
+    displayName: Inspect container image metadata
+    inputs:
+      targetType: inline
+      script: |
+        set -euo pipefail
+        docker image inspect \
+          "${{ parameters.imageRepository }}:${{ parameters.imageTag }}" \
+          --format 'Image={{.Id}} Size={{.Size}} Created={{.Created}}'
